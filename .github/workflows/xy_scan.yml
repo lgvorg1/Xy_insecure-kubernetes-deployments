@@ -1,14 +1,14 @@
 # This is a basic workflow to help you get started with Actions 
 
-name: Xygeni CI/CD Security Scan
+name: Xygeni CI/CD Security Scan (strict)
 
 # Controls when the workflow will run
 on:
   push: 
-    branches: [ "main" ]
+    branches: [ "mainx" ]
   # Triggers the workflow on pull request events for the "main" branch
   pull_request_target: 
-    branches: [ "main" ]
+    branches: [ "mainx" ]
 
   # Allows you to run this workflow manually from the Actions tab sd 
   workflow_dispatch:
@@ -18,14 +18,15 @@ on:
           description: Xygeni Env
           options: 
           - PRO
+          - PRO_TRIAL
           - DEMO
-          - PARTNERS
+          - DEMO_TRIAL
           default: PRO
  
 env:
   
   XY_ENV: ${{ github.event_name == 'push' && 'PRO' || github.event.inputs.xy-env }}
-  XY_PRJ_NAME: GitHub-${{ github.event.repository.name }}
+  XY_PRJ_NAME: github_${{ github.event.repository.name }}_${XY_ENV}
 
 
 jobs:
@@ -49,24 +50,35 @@ jobs:
               echo XY_USERNAME=${{ secrets.XY_USERNAME_PRO }} >> $GITHUB_ENV
               echo XY_PASSWORD=${{ secrets.XY_PASSWORD_PRO }} >> $GITHUB_ENV
               echo XY_URL=${{ secrets.XY_URL_PRO }} >> $GITHUB_ENV
+              echo XY_TOKEN=${{ secrets.XY_TOKEN_PRO }} >> $GITHUB_ENV 
+              ;;
+            PRO_TRIAL)
+              echo "PRO_TRIAL"
+              echo XY_USERNAME=${{ secrets.XY_USERNAME_PRO_TRIAL }} >> $GITHUB_ENV
+              echo XY_PASSWORD=${{ secrets.XY_PASSWORD_PRO_TRIAL }} >> $GITHUB_ENV
+              echo XY_URL=${{ secrets.XY_URL_PRO_TRIAL }} >> $GITHUB_ENV
+              echo XY_TOKEN=${{ secrets.XY_TOKEN_PRO_TRIAL }} >> $GITHUB_ENV 
               ;;
             DEMO)
               echo "DEMO"
               echo XY_USERNAME=${{ secrets.XY_USERNAME_DEMO }} >> $GITHUB_ENV
               echo XY_PASSWORD=${{ secrets.XY_PASSWORD_DEMO }} >> $GITHUB_ENV
               echo XY_URL=${{ secrets.XY_URL_DEMO }} >> $GITHUB_ENV
+              echo XY_TOKEN=${{ secrets.XY_TOKEN_DEMO }} >> $GITHUB_ENV            
               ;;
-            PARTNERS)
-              echo "PARTNERS"
-              echo XY_USERNAME=${{ secrets.XY_USERNAME_PARTNERS }} >> $GITHUB_ENV
-              echo XY_PASSWORD=${{ secrets.XY_PASSWORD_PARTNERS }} >> $GITHUB_ENV
-              echo XY_URL=${{ secrets.XY_URL_PARTNERS }} >> $GITHUB_ENV
+            DEMO_TRIAL)
+              echo "DEMO_TRIAL"
+              echo XY_USERNAME=${{ secrets.XY_USERNAME_DEMO_TRIAL }} >> $GITHUB_ENV
+              echo XY_PASSWORD=${{ secrets.XY_PASSWORD_DEMO_TRIAL }} >> $GITHUB_ENV
+              echo XY_URL=${{ secrets.XY_URL_DEMO_TRIAL }} >> $GITHUB_ENV
+              echo XY_TOKEN=${{ secrets.XY_TOKEN_DEMO_TRIAL }} >> $GITHUB_ENV
               ;;
             *)
               echo "DEFAULT (PRO)"
               echo XY_USERNAME=${{ secrets.XY_USERNAME_PRO }} >> $GITHUB_ENV
               echo XY_PASSWORD=${{ secrets.XY_PASSWORD_PRO }} >> $GITHUB_ENV
               echo XY_URL=${{ secrets.XY_URL_PRO }} >> $GITHUB_ENV
+              echo XY_TOKEN=${{ secrets.XY_TOKEN_PRO }} >> $GITHUB_ENV 
               ;;
           esac
 
@@ -92,24 +104,48 @@ jobs:
           fetch-depth: '0'
 
 
+      #- name: Check out repo A
+      #  uses: actions/checkout@v4
+      #  with:
+      #      repository: lgvorg1/xyware-goat
+      #      path: path_to_xyware.goat
+      #      ref: master
+      #      token: ${{ secrets.GH_PAT }}
+
       # Runs a set of commands using the runners shell 
       - name: Download Xygeni Scanner 
         run: |
           echo Downloading Xygeni Scanner ....
+          echo yarn && yarn -version
+          mvn -version
+          java -version
 
+          #curl -L https://get.xygeni.io/latest/scanner/install.sh | /bin/bash -s -- -t "$XY_TOKEN" -s $XY_URL -d ${GITHUB_WORKSPACE}/scanner 
           #curl -L https://get.xygeni.io/latest/scanner/install.sh | /bin/bash -s -- -u $XY_USERNAME -p $XY_PASSWORD -s $XY_URL -d ${GITHUB_WORKSPACE}/scanner 
-          curl -L https://get.xygeni.io/latest/scanner/install.sh | /bin/bash -s -- -u $XY_USERNAME -p $XY_PASSWORD -s $XY_URL -d ${GITHUB_WORKSPACE}/scanner 
-          
+          curl -sLO https://get.xygeni.io/latest/scanner/install.sh
+          chmod +x install.sh
+          ./install.sh -o -v -t "$XY_TOKEN" -s $XY_URL -d ${GITHUB_WORKSPACE}/scanner
+            
           cat ${GITHUB_WORKSPACE}/scanner/conf/codetampering/ccm/workflow_modification.yml | grep changeTypesToConsider
           sed -i 's/changeTypesToConsider: M/changeTypesToConsider: AM/g' ${GITHUB_WORKSPACE}/scanner/conf/codetampering/ccm/workflow_modification.yml
           cat ${GITHUB_WORKSPACE}/scanner/conf/codetampering/ccm/workflow_modification.yml | grep changeTypesToConsider
+        #env:
+        #  API_KEY: ${{ secrets.XY_TOKEN_PRO_TRIAL }}
           
           
       # Runs a set of commands using the runners shell
       - name: Execution Xygeni Scanner (vuln)
         run: |
           echo Executing Xygeni scan ....    
-          
-          ${GITHUB_WORKSPACE}/scanner/xygeni scan  --never-fail  -f none --include-collaborators --run="inventory,misconf,codetamper,deps,suspectdeps,secrets,compliance,iac,malware" --no-conf-download -n ${{ env.XY_PRJ_NAME }} --dir ${GITHUB_WORKSPACE} -e **/scanner/**
+          #--no-conf-download  malware
+          #${GITHUB_WORKSPACE}/scanner/xygeni scan  --never-fail  -f json -o reports/my_project --include-collaborators --run="inventory,misconf,codetamper,deps,suspectdeps,secrets,compliance,iac" -n ${{ env.XY_PRJ_NAME }} --dir ${GITHUB_WORKSPACE} -e **/scanner/**,**/repos/**,**/path_to_xyware.goat/malicious/java/**
+          ${GITHUB_WORKSPACE}/scanner/xygeni scan  --never-fail  --include-collaborators --run="inventory,misconf,codetamper,deps,suspectdeps,secrets,compliance,iac" -n ${{ env.XY_PRJ_NAME }} --dir ${GITHUB_WORKSPACE} -e "**/scanner/**,**/repos/**,**/path_to_xyware.goat/malicious/java/**,**/.github/workflows/semgrep.yml,**/reports/**,xygeni_demo_trial.sh,xygeni_pro_trial.sh,snyk.sh"
         env:
           GITHUB_PAT: ${{ secrets.GH_PAT }}
+
+      - name: Archive building artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: archive-bin
+          path: |
+             reports
