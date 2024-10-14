@@ -3,8 +3,8 @@ name: Publish Docker images
 on:
   release:
     types: [published]
-  schedule:
-    - cron: '0 0 * * *'  # Nightly builds
+  #schedule:
+  #  - cron: '0 0 * * *'  # Nightly builds
   workflow_dispatch:  # Manually trigger a workflow run
 
 jobs:
